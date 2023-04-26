@@ -1,14 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using KdTree;
-using KdTree.Math;
 
 namespace NearestVehiclePositions
 {
     class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             // Load vehicle positions from binary file
             var vehicles = LoadVehiclePositions();
@@ -28,32 +26,51 @@ namespace NearestVehiclePositions
                 (32.234235, -100.222222)
             };
 
-            // Build k-d tree of vehicle positions
-            var tree = new KdTree<double, int>(2, new DoubleMath());
-
             if (vehicles == null)
             {
                 throw new ArgumentException("no vehicles found");
             }
 
-
-            foreach (var vehicle in vehicles)
-            {
-                tree.Add(new[] { vehicle.longitude, vehicle.latitude }, vehicle.positionId);
-            }
-
             // Find nearest vehicle position to each coordinate
-        
-
-            Parallel.ForEach(coordinates, coordinate =>
+            foreach (var coordinate in coordinates)
             {
+                VehiclePosition nearestVehicle = null;
+                double minDistance = double.MaxValue;
 
-                var nearest = tree.GetNearestNeighbours(new[] { coordinate.longitude, coordinate.latitude }, 1)[0];
-                var nearestVehicle = vehicles[nearest.Value];
-                Console.WriteLine($"Nearest vehicle to ({coordinate.latitude}, {coordinate.longitude}) is {nearestVehicle.vehicleRegistration} at ({nearestVehicle.latitude}, {nearestVehicle.longitude})");
-            });
+                foreach (var vehicle in vehicles)
+                {
+                    var distance = CalculateDistance(coordinate.latitude, coordinate.longitude, vehicle.Latitude,
+                        vehicle.Longitude);
 
+                    if (distance < minDistance)
+                    {
+                        minDistance = distance;
+                        nearestVehicle = vehicle;
+                    }
+                }
 
+                Console.WriteLine(
+                    $"Nearest vehicle to ({coordinate.latitude}, {coordinate.longitude}) is {nearestVehicle.VehicleRegistration} at ({nearestVehicle.Latitude}, {nearestVehicle.Longitude})");
+            }
+        }
+
+        static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        {
+            var r = 6371; // Earth's radius in kilometers
+            var dLat = ToRadians(lat2 - lat1);
+            var dLon = ToRadians(lon2 - lon1);
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            var distance = r * c;
+
+            return distance;
+        }
+
+        static double ToRadians(double degrees)
+        {
+            return degrees * Math.PI / 180;
         }
 
         static List<VehiclePosition> LoadVehiclePositions()
@@ -77,24 +94,27 @@ namespace NearestVehiclePositions
 
                         positions.Add(new VehiclePosition
                         {
-                            positionId = positionId,
-                            vehicleRegistration = vehicleRegistration,
-                            latitude = latitude,
-                            longitude = longitude,
-                            recordedTimeUtc = recordedTimeUtc
+                            PositionId = positionId,
+                            VehicleRegistration = vehicleRegistration,
+                            Latitude = latitude,
+                            Longitude = longitude,
+                            RecordedTimeUtc = recordedTimeUtc
                         });
                     }
                 }
 
                 return positions;
             }
-            catch (Exception ex)
+            catch (Exception Ex)
             {
-                Console.WriteLine($"Error {ex.Message} ");
+                Console.WriteLine($"Error: {Ex.Message}");
             }
 
-            return  null;
+
+            return null;
         }
+
+
 
         static string ReadNullTerminatedString(BinaryReader reader)
         {
@@ -114,14 +134,19 @@ namespace NearestVehiclePositions
                 throw new Exception("error");
             }
         }
-    }
 
-    class VehiclePosition
-    {
-        public int positionId;
-        public string vehicleRegistration;
-        public double latitude;
-        public double longitude;
-        public ulong recordedTimeUtc;
+
+        class VehiclePosition
+        {
+            public int PositionId;
+            public string VehicleRegistration;
+            public double Latitude;
+            public double Longitude;
+            public ulong RecordedTimeUtc;
+        }
     }
 }
+
+
+
+
